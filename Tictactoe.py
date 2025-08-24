@@ -23,18 +23,22 @@ def make_move(board, player, row, col):
 		print("No se puede realizar ese movimiento\n")
 		return False
 	
-def victory(board, player):
-	for i in range(3):
-		if board[i][0] == player and board[i][1] == player and board[i][2] == player:
-			return True
-		if board[0][i] == player and board[1][i] == player and board[2][i] == player:
-			return True
-	if board[0][0] == player and board[1][1] == player and board[2][2] == player:
-		return True
-	if board[0][2] == player and board[1][1] == player and board[2][0] == player:
-		return True
+def winner(board):
+	for player in ["X", "O"]:
+		for i in range(3):
+			if board[i][0] == player and board[i][1] == player and board[i][2] == player:
+				return player
+			if board[0][i] == player and board[1][i] == player and board[2][i] == player:
+				return player
+		if board[0][0] == player and board[1][1] == player and board[2][2] == player:
+				return player
+		if board[0][2] == player and board[1][1] == player and board[2][0] == player:
+				return player
+	return None
 	
 def game_over(board):
+	if winner(board):
+		return True
 	for i in range(3):
 		for j in range(3):
 			if board[i][j] == " ":
@@ -44,16 +48,11 @@ def game_over(board):
 
 player = input("Jugador 1, como quieres jugar? (X o O): ")
 
-#if player == "X":
-#	computer = "O"
-#else:
-#	computer = "X"
-
 board = initialize_board()
 print_board(board)
-winner = False
+champ = False
 
-while not game_over(board) and not winner:
+while not game_over(board) and not champ:
 	row = int(input(f"Jugador {player}, en que fila quieres jugar? (0-2): "))
 	while not 0 <= row <= 2:
 		row = int(input("ERROR!!! Ingresa una fila dentro de los limites (0-2): "))
@@ -63,9 +62,9 @@ while not game_over(board) and not winner:
 
 	if make_move(board, player, row, column):
 		print_board(board)
-		if victory(board, player):
+		if winner(board):
 			print(f"Felicidades jugador {player}!!! Has ganado.")
-			winner = True
+			champ = True
 		player = "X" if player == "O" else "O"
 
-if not winner: print("No hay ganador :(")
+if not champ: print("No hay ganador :(")
