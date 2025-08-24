@@ -21,6 +21,9 @@ def apply_move(board, move, player):
 	new_board = copy_board(board)
 	new_board[move[0]][move[1]] = player
 	return new_board
+
+def switch_player(to_move):
+	return "O" if to_move == "X" else "X"
 	
 def winner(board):
 	for player in ["X", "O"]:
@@ -56,7 +59,7 @@ def rotate90(board):
 def reflect_h(board):
     return [list(reversed(row)) for row in board]
 
-def minimal_symmetry(board):
+def all_symmetries(board):
     b0 = [row[:] for row in board]
     b1 = rotate90(b0)
     b2 = rotate90(b1)
@@ -65,7 +68,10 @@ def minimal_symmetry(board):
     m1 = rotate90(m0)
     m2 = rotate90(m1)
     m3 = rotate90(m2)
-    return min(tuple([b0, b1, b2, b3, m0, m1, m2, m3]))
+    return [b0, b1, b2, b3, m0, m1, m2, m3]
+
+def min_board(board):
+	return min(tuple(cell for row in b for cell in row) for b in all_symmetries(board))
 
 def order_moves(board):
 	moves = legal_moves(board)
@@ -80,7 +86,74 @@ def order_moves(board):
 
 	return seq
 
+posible_boards = {}
+stats = {"nodes": 0, "coincidences": 0, "prunes": 0}
 
+def reset_stats():
+	stats["nodes"] = 0
+	stats["coincidences"] = 0
+	stats["prunes"] = 0
+
+def alpha_beta(board, to_move, alpha = -math.inf, beta = math.inf):
+	stats["nodes"] += 1
+	
+	if is_terminal(board):
+		return utility(board), None
+	
+	current_key = (min_board(board), to_move)	
+	moves = order_moves(board)
+	best_move = 0
+
+	if to_move == "X":
+		value = -math.inf
+	
+		for i, move in enumerate(moves):
+			child = apply_move(board, move, "X")
+			child_key = (min_board(child), switch_player(to_move))
+
+			if child_key in posible_boards:
+				stats["coincidences"] += 1
+				child_value = posible_boards[child_key]
+			else:
+				child_value, _ = alpha_beta(child, switch_player(to_move), alpha, beta)
+				posible_boards[child_key] = child_value
+
+			if child_value > value:
+				value = child_value
+				best_move = move
+			alpha = max(alpha, value)
+			if alpha >= beta:
+				stats["prunes"] += len(moves) - (i + 1)
+				break
+	else:
+		value = math.inf
+	
+		for i, move in enumerate(moves):
+			child = apply_move(board, move, "O")
+			child_key = (min_board(child), switch_player(to_move))
+
+			if child_key in posible_boards:
+				stats["coincidences"] += 1
+				child_value = posible_boards[child_key]
+			else:
+				child_value, _ = alpha_beta(child, switch_player(to_move), alpha, beta)
+				posible_boards[child_key] = child_value
+
+			if child_value < value:
+				value = child_value
+				best_move = move
+			beta = min(beta, value)
+			if alpha >= beta:
+				stats["prunes"] += len(moves) - (i + 1)
+				break
+
+	posible_boards[current_key] = value
+	return value, best_move
+
+def ai_best_move(board, to_move):
+	reset_stats()
+	value, move = alpha_beta(board, to_move)
+	return value, move
 
 def ask_human():
 	while True:
@@ -100,7 +173,7 @@ def human_move(board):
 
 def main():
 	player = ask_human()
-	ia = "O" if player == "X" else "X"
+	ia = switch_player(player)
 	print(f"La IA jugara como {ia}")
 	board = initialize_board()
 	print_board(board)
@@ -113,10 +186,16 @@ def main():
 			print_board(board)
 			if is_terminal(board):
 				break
-			to_move = "O" if to_move == "X" else "X"
+			to_move = switch_player(to_move)
 		else:
-			print("Va la ia")
-			to_move = "O" if to_move == "X" else "X"
+			value, move = ai_best_move(board, to_move)
+			board = apply_move(board, move, to_move)
+			print(f"La IA juega {move}. Valor con respecto a X: {value}")
+			print(f"Nodos revisados: {stats['nodes']} | Coincidencias Simetricas: {stats['coincidences']} | Podas: {stats['prunes']}")
+			print_board(board)
+			if is_terminal(board):
+				break
+			to_move = switch_player(to_move)
 
 	w = winner(board)
 	if w is None: print("Empate -_-")
