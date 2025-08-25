@@ -94,66 +94,89 @@ def reset_stats():
 	stats["coincidences"] = 0
 	stats["prunes"] = 0
 
+def better_for_max(cand, best):
+	(b_value, b_move, b_distance) = best
+	(c_value, c_move, c_distance) = cand
+
+	if b_value != c_value:
+		return c_value>b_value
+	if c_value > 0:
+		return c_distance<b_distance
+	if c_value < 0:
+		return c_distance>b_distance
+	return c_distance>b_distance
+	
+def better_for_min(cand, best):
+	(b_value, b_move, b_distance) = best
+	(c_value, c_move, c_distance) = cand
+
+	if b_value != c_value:
+		return c_value<b_value
+	if c_value > 0:
+		return c_distance>b_distance
+	if c_value < 0:
+		return c_distance<b_distance
+	return c_distance<b_distance
+
 def alpha_beta(board, to_move, alpha = -math.inf, beta = math.inf):
 	stats["nodes"] += 1
 	
 	if is_terminal(board):
-		return utility(board), None
+		return utility(board), None, 0
 	
-	current_key = (min_board(board), to_move)	
+	key_here = (min_board(board), to_move)
 	moves = order_moves(board)
-	best_move = 0
 
 	if to_move == "X":
-		value = -math.inf
-	
+		best = (-math.inf, None, math.inf)
 		for i, move in enumerate(moves):
 			child = apply_move(board, move, "X")
 			child_key = (min_board(child), switch_player(to_move))
 
 			if child_key in posible_boards:
 				stats["coincidences"] += 1
-				child_value = posible_boards[child_key]
+				child_value, child_distance = posible_boards[child_key]
 			else:
-				child_value, _ = alpha_beta(child, switch_player(to_move), alpha, beta)
-				posible_boards[child_key] = child_value
+				child_value, _, child_distance = alpha_beta(child, switch_player(to_move), alpha, beta)
+				posible_boards[child_key] = (child_value, child_distance)
 
-			if child_value > value:
-				value = child_value
-				best_move = move
-			alpha = max(alpha, value)
+			cand = (child_value, move, child_distance + 1)
+			if better_for_max(cand, best):
+				best = cand
+
+			alpha = max(alpha, best[0])
 			if alpha >= beta:
 				stats["prunes"] += len(moves) - (i + 1)
 				break
 	else:
-		value = math.inf
-	
+		best = (math.inf, None, math.inf)
 		for i, move in enumerate(moves):
 			child = apply_move(board, move, "O")
 			child_key = (min_board(child), switch_player(to_move))
 
 			if child_key in posible_boards:
 				stats["coincidences"] += 1
-				child_value = posible_boards[child_key]
+				child_value, child_distance = posible_boards[child_key]
 			else:
-				child_value, _ = alpha_beta(child, switch_player(to_move), alpha, beta)
-				posible_boards[child_key] = child_value
+				child_value, _, child_distance = alpha_beta(child, switch_player(to_move), alpha, beta)
+				posible_boards[child_key] = child_value, child_distance
 
-			if child_value < value:
-				value = child_value
-				best_move = move
-			beta = min(beta, value)
+			cand = (child_value, move, child_distance + 1)
+			if better_for_min(cand, best):
+				best = cand
+
+			beta = min(beta, best[0])
 			if alpha >= beta:
 				stats["prunes"] += len(moves) - (i + 1)
 				break
 
-	posible_boards[current_key] = value
-	return value, best_move
+	posible_boards[key_here] = (best[0], best[2])
+	return best[0], best[1], best[2]
 
 def ai_best_move(board, to_move):
 	reset_stats()
-	value, move = alpha_beta(board, to_move)
-	return value, move
+	value, move, distance = alpha_beta(board, to_move)
+	return value, move, distance
 
 def ask_human():
 	while True:
@@ -163,13 +186,16 @@ def ask_human():
 
 def human_move(board):
 	moves = legal_moves(board)
-	row = int(input(f"En que fila quieres jugar? (0-2): "))
-	while not 0 <= row <= 2:
-		row = int(input("ERROR!!! Ingresa una fila dentro de los limites (0-2): "))
-	column = int(input(f"En que columna quieres jugar? (0-2): "))
-	while not 0 <= column <= 2:
-		column = int(input("ERROR!!! Ingresa una columna dentro de los limites (0-2): "))
-	return (row, column)
+	while True:
+		row = int(input(f"En que fila quieres jugar? (0-2): "))
+		while not 0 <= row <= 2:
+			row = int(input("ERROR!!! Ingresa una fila dentro de los limites (0-2): "))
+		column = int(input(f"En que columna quieres jugar? (0-2): "))
+		while not 0 <= column <= 2:
+			column = int(input("ERROR!!! Ingresa una columna dentro de los limites (0-2): "))
+		if (row, column) in moves:	
+			return (row, column)
+		print("ERROR!!! No puedes realizar ese movimiento\n")
 
 def main():
 	player = ask_human()
@@ -188,9 +214,9 @@ def main():
 				break
 			to_move = switch_player(to_move)
 		else:
-			value, move = ai_best_move(board, to_move)
+			value, move, distance = ai_best_move(board, to_move)
 			board = apply_move(board, move, to_move)
-			print(f"La IA juega {move}. Valor con respecto a X: {value}")
+			print(f"La IA juega {move}. Valor con respecto a X: {value} | Distancia hasta final: {distance}")
 			print(f"Nodos revisados: {stats['nodes']} | Coincidencias Simetricas: {stats['coincidences']} | Podas: {stats['prunes']}")
 			print_board(board)
 			if is_terminal(board):
